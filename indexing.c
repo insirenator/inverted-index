@@ -1,5 +1,7 @@
 #include "indexing.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define HASHTABLE_SIZE 1000
 #define MAX_LINE 200
@@ -14,6 +16,132 @@ static void clear_str(char *str, size_t len) {
 
 static bool is_noise_char(char c) {
     return c == '.' || c == '?' || c == '!' || c == ',' || c == '"' || c == ';';
+}
+
+void print_result_line(char *line, unsigned int start_pos, unsigned int end_pos) {
+    printf("...");
+    unsigned int i = 0;
+    while(line[i] != '\0') {
+        if(i == start_pos) {
+            printf("\033[1;31m");
+        }
+
+        printf("%c", line[i]);
+
+        if(i == end_pos) {
+            printf("\033[0m");
+        }
+        i++;
+    }
+    printf("...\n");
+}
+
+void search_result(char *filename, entry *e) {
+    char *pos_mark = e->object;
+    unsigned int *line_pos_buffer = calloc(1000, sizeof(unsigned int));
+    unsigned int *word_pos_buffer = calloc(1000, sizeof(unsigned int));
+    unsigned int *char_pos_buffer = calloc(1000, sizeof(unsigned int));
+
+    unsigned int pmi = 0; // pos_mark index
+    unsigned int pmci = 0; // pos_mark character index
+    
+    unsigned int numi = 0; // number index
+    char num[10];
+    char *endptr;
+
+    while(pos_mark[pmci] != '\0') {
+        clear_str(num, sizeof(num));
+        numi = 0;
+
+        while(true){
+            if(pos_mark[pmci] == ':'){
+                line_pos_buffer[pmi] = strtoul(num, &endptr, 10);
+                pmci++;
+                numi = 0;
+                clear_str(num, sizeof(num));
+                break;
+            }
+
+            num[numi] = pos_mark[pmci];
+            pmci++;
+            numi++;
+        }
+
+        while(true){
+            if(pos_mark[pmci] == ':'){
+                word_pos_buffer[pmi] = strtoul(num, &endptr, 10);
+                pmci++;
+                numi = 0;
+                clear_str(num, sizeof(num));
+                break;
+            }
+
+            num[numi] = pos_mark[pmci];
+            pmci++;
+            numi++;
+        }
+
+        while(true){
+            if(pos_mark[pmci] == ','){
+                char_pos_buffer[pmi] = strtoul(num, &endptr, 10);
+                pmci++;
+                pmi++;
+                numi = 0;
+                clear_str(num, sizeof(num));
+                break;
+            }
+
+            if(pos_mark[pmci] == '\0'){
+                char_pos_buffer[pmi] = strtoul(num, &endptr, 10);
+                numi = 0;
+                clear_str(num, sizeof(num));
+                break;
+            }
+
+            num[numi] = pos_mark[pmci];
+            pmci++;
+            numi++;
+        }
+
+    }
+
+    printf("Found %d marker(s)\n", pmi + 1);
+
+    FILE *fp = fopen(filename, "r");
+    if(fp == NULL) {
+        printf("failed to open file: %s", filename);
+        return;
+    }
+
+    char buffer[MAX_LINE];
+    unsigned int line = 0;
+
+    while(!feof(fp) && fgets(buffer, MAX_LINE, fp) != NULL) {
+        // skip new lines
+        if(buffer[0] == '\n') {
+            continue;
+        }
+
+        for(unsigned int i = 0; i <= pmi; i++) {
+            if(line_pos_buffer[i] == line) {
+                buffer[strcspn(buffer, "\n")] = '\0';
+                print_result_line(
+                    buffer,
+                    char_pos_buffer[i],
+                    char_pos_buffer[i] + strlen(e->key) - 1
+                );
+            }
+        }
+
+        line++;
+    }
+
+    fclose(fp);
+
+    free(line_pos_buffer);
+    free(word_pos_buffer);
+    free(char_pos_buffer);
+    return;
 }
 
 hash_table *create_file_index(char *filename) {

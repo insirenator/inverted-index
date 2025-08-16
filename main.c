@@ -23,11 +23,11 @@ int main() {
         search[strcspn(search, "\n")] = '\0';
         entry *found = hash_table_lookup(table, search);
         if(found == NULL) {
-            printf("NOT FOUND (%s)\n\n", search);
+            printf("NOT FOUND (%s)", search);
         } else {
-            printf("FOUND (%s): %s\n\n", search, found->object);
+            search_result(filename, found);
         }
-        printf("Enter keyword to search (Ctrl^D to quit): ");
+        printf("\n\nEnter keyword to search (Ctrl^D to quit): ");
     }
 
     hash_table_destroy(table);
